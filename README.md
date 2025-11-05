@@ -1,3 +1,3 @@
 # whosthere
 
-t.b.d.
+TUI Application to discover devices on your local area network it's subnet.
