@@ -4,12 +4,65 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/ramonvermeulen/whosthere/internal/oui"
+	"go.uber.org/zap"
 )
+
+// Scanner defines a discovery strategy (SSDP, mDNS, ARP, etc.).
+type Scanner interface {
+	Name() string
+	Scan(ctx context.Context, out chan<- Device) error
+}
 
 // Engine coordinates multiple scanners and merges device results.
 type Engine struct {
-	Scanners []Scanner
-	Timeout  time.Duration
+	Scanners    []Scanner
+	Timeout     time.Duration
+	OUIRegistry *oui.Registry
+}
+
+type EngineOption func(*Engine)
+
+func WithTimeout(d time.Duration) EngineOption {
+	return func(e *Engine) { e.Timeout = d }
+}
+
+func WithOUIRegistry(r *oui.Registry) EngineOption {
+	return func(e *Engine) { e.OUIRegistry = r }
+}
+
+func NewEngine(scanners []Scanner, opts ...EngineOption) *Engine {
+	e := &Engine{
+		Scanners: scanners,
+		Timeout:  6 * time.Second,
+	}
+	for _, opt := range opts {
+		opt(e)
+	}
+	return e
+}
+
+// fillManufacturerIfEmpty fills the Manufacturer field of the device using OUI lookup if it's empty.
+func (e *Engine) fillManufacturerIfEmpty(d *Device) {
+	if d == nil {
+		return
+	}
+	if e.OUIRegistry == nil {
+		zap.L().Debug("OUI: registry is nil; skipping manufacturer lookup")
+		return
+	}
+	if d.Manufacturer != "" {
+		return
+	}
+	if d.MAC == "" {
+		zap.L().Debug("OUI: device has no MAC; skipping", zap.String("ip", d.IP.String()))
+		return
+	}
+	if org, ok := e.OUIRegistry.Lookup(d.MAC); ok {
+		zap.L().Debug("OUI: setting manufacturer from OUI", zap.String("ip", d.IP.String()), zap.String("mac", d.MAC), zap.String("org", org))
+		d.Manufacturer = org
+	}
 }
 
 // Stream runs scanners and invokes onDevice for each incremental merged device observed.
@@ -55,11 +108,13 @@ func (e *Engine) Stream(ctx context.Context, onDevice func(Device)) ([]Device, e
 			key := d.IP.String()
 			if existing, found := devices[key]; found {
 				existing.Merge(d)
+				e.fillManufacturerIfEmpty(existing)
 				if onDevice != nil {
 					onDevice(*existing)
 				}
 			} else {
 				dev := d
+				e.fillManufacturerIfEmpty(&dev)
 				devices[key] = &dev
 				if onDevice != nil {
 					onDevice(dev)

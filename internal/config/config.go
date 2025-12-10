@@ -1,8 +1,13 @@
 package config
 
+import "time"
+
 const (
 	DefaultSplashEnabled = true
 	DefaultSplashDelay   = float32(1.0)
+
+	DefaultScanInterval = 30 * time.Second
+	DefaultScanDuration = 15 * time.Second
 )
 
 // ThemeConfig mirrors tview.Theme; all fields are optional strings that
@@ -23,8 +28,10 @@ type ThemeConfig struct {
 
 // Config captures runtime configuration values loaded from the YAML config file.
 type Config struct {
-	Splash SplashConfig `yaml:"splash"`
-	Theme  ThemeConfig  `yaml:"theme"`
+	Splash       SplashConfig  `yaml:"splash"`
+	Theme        ThemeConfig   `yaml:"theme"`
+	ScanInterval time.Duration `yaml:"scan_interval"`
+	ScanDuration time.Duration `yaml:"scan_duration"`
 }
 
 // SplashConfig controls the splash screen visibility and timing.
@@ -53,5 +60,7 @@ func DefaultConfig() *Config {
 			InverseTextColor:            "#000a1a",
 			ContrastSecondaryTextColor:  "#88ddff",
 		},
+		ScanInterval: DefaultScanInterval,
+		ScanDuration: DefaultScanDuration,
 	}
 }

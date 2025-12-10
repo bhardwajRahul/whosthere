@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"os"
 
 	"github.com/ramonvermeulen/whosthere/internal/config"
 	"github.com/ramonvermeulen/whosthere/internal/logging"
+	"github.com/ramonvermeulen/whosthere/internal/oui"
 	"github.com/ramonvermeulen/whosthere/internal/ui"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -46,21 +48,28 @@ func Execute() {
 }
 
 func run(*cobra.Command, []string) error {
+	ctx := context.Background()
+
 	level := logging.LevelFromEnv(zapcore.InfoLevel)
-	logger, logPath, err := logging.Init(appName, level)
+	logger, logPath, err := logging.Init(appName, level, false)
 	if err != nil {
 		return err
 	} else {
 		logger.Info("logger initialized", zap.String("path", logPath), zap.String("level", level.String()))
 	}
 
-	cfg, _, err := config.Load(whosthereFlags.ConfigFile)
+	cfg, err := config.Load(whosthereFlags.ConfigFile)
 	if err != nil {
 		zap.L().Error("failed to load or create config", zap.Error(err))
 		return err
 	}
 
-	app := ui.NewApp(cfg)
+	ouiDB, err := oui.Init(ctx)
+	if err != nil {
+		zap.L().Warn("failed to initialize OUI database; manufacturer lookups will be disabled", zap.Error(err))
+	}
+
+	app := ui.NewApp(cfg, ouiDB)
 	if err := app.Run(); err != nil {
 		zap.L().Error("ui run failed", zap.Error(err))
 		return err

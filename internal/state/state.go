@@ -72,3 +72,10 @@ func (s *AppState) Selected() (discovery.Device, bool) {
 	d, ok := s.devices[s.selectedIP]
 	return d, ok
 }
+
+// SelectedIP returns the currently selected device IP, if any.
+func (s *AppState) SelectedIP() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.selectedIP
+}

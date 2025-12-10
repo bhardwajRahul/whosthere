@@ -3,7 +3,6 @@ package components
 import (
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/derailed/tview"
@@ -24,6 +23,8 @@ func NewDeviceTable() *DeviceTable {
 		SetTitle("Devices").
 		SetBorderColor(tview.Styles.BorderColor).
 		SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
+
+	t.SetFixed(1, 0)
 	t.SetSelectable(true, false)
 	t.Select(0, 0)
 	t.refresh()
@@ -93,39 +94,58 @@ func (dt *DeviceTable) SelectLast() {
 	}
 }
 
+type tableRow struct {
+	ip, hostname, mac, manufacturer, model, lastSeen string
+}
+
+func (dt *DeviceTable) buildRows() []tableRow {
+	rows := make([]tableRow, 0, len(dt.devices))
+	for _, d := range dt.devices {
+		rows = append(rows, tableRow{
+			ip:           d.IP.String(),
+			hostname:     d.Hostname,
+			mac:          d.MAC,
+			manufacturer: d.Manufacturer,
+			model:        d.Model,
+			lastSeen:     fmtDuration(time.Since(d.LastSeen)),
+		})
+	}
+	sort.Slice(rows, func(i, j int) bool { return rows[i].ip < rows[j].ip })
+	return rows
+}
+
 func (dt *DeviceTable) refresh() {
 	dt.Clear()
+	const maxColWidth = 30
 
-	headers := []string{"IP", "Hostname", "MAC", "Manufacturer", "Model", "Services", "Sources", "Last Seen"}
+	headers := []string{"IP", "Hostname", "MAC", "Manufacturer", "Model", "Last Seen"}
+
 	for i, h := range headers {
-		dt.SetCell(0, i, tview.NewTableCell(h).
+		text := truncate(h, maxColWidth)
+		dt.SetCell(0, i, tview.NewTableCell(text).
 			SetSelectable(false).
 			SetTextColor(tview.Styles.SecondaryTextColor).
 			SetExpansion(1))
 	}
 
-	list := make([]discovery.Device, 0, len(dt.devices))
-	for _, v := range dt.devices {
-		list = append(list, v)
-	}
-	// TODO(ramon): maybe this can be simplified? Sorting directly while iterating?
-	sort.Slice(list, func(i, j int) bool { return list[i].IP.String() < list[j].IP.String() })
+	rows := dt.buildRows()
 
-	for row, d := range list {
-		r := row + 1
-		ip := ""
-		if d.IP != nil {
-			ip = d.IP.String()
-		}
-		seen := fmtDuration(time.Since(d.LastSeen))
-		dt.SetCell(r, 0, tview.NewTableCell(ip).SetExpansion(1))
-		dt.SetCell(r, 1, tview.NewTableCell(d.Hostname).SetExpansion(1))
-		dt.SetCell(r, 2, tview.NewTableCell(d.MAC).SetExpansion(1))
-		dt.SetCell(r, 3, tview.NewTableCell(d.Manufacturer).SetExpansion(1))
-		dt.SetCell(r, 4, tview.NewTableCell(d.Model).SetExpansion(1))
-		dt.SetCell(r, 5, tview.NewTableCell(formatServices(d.Services)).SetExpansion(1))
-		dt.SetCell(r, 6, tview.NewTableCell(formatSources(d.Sources)).SetExpansion(1))
-		dt.SetCell(r, 7, tview.NewTableCell(seen).SetExpansion(1))
+	for rowIndex, rowData := range rows {
+		r := rowIndex + 1
+
+		ipText := truncate(rowData.ip, maxColWidth)
+		hostText := truncate(rowData.hostname, maxColWidth)
+		macText := truncate(rowData.mac, maxColWidth)
+		manuText := truncate(rowData.manufacturer, maxColWidth)
+		modelText := truncate(rowData.model, maxColWidth)
+		seenText := truncate(rowData.lastSeen, maxColWidth)
+
+		dt.SetCell(r, 0, tview.NewTableCell(ipText).SetExpansion(1))
+		dt.SetCell(r, 1, tview.NewTableCell(hostText).SetExpansion(1))
+		dt.SetCell(r, 2, tview.NewTableCell(macText).SetExpansion(1))
+		dt.SetCell(r, 3, tview.NewTableCell(manuText).SetExpansion(1))
+		dt.SetCell(r, 4, tview.NewTableCell(modelText).SetExpansion(1))
+		dt.SetCell(r, 5, tview.NewTableCell(seenText).SetExpansion(1))
 	}
 }
 
@@ -139,30 +159,12 @@ func fmtDuration(d time.Duration) string {
 	return fmt.Sprintf("%dm", int(d/time.Minute))
 }
 
-func formatServices(svc map[string]int) string {
-	if len(svc) == 0 {
-		return ""
+func truncate(s string, max int) string {
+	if max <= 0 || len(s) <= max {
+		return s
 	}
-	parts := make([]string, 0, len(svc))
-	for name, port := range svc {
-		if port > 0 {
-			parts = append(parts, fmt.Sprintf("%s:%d", name, port))
-		} else {
-			parts = append(parts, name)
-		}
+	if max <= 1 {
+		return s[:max]
 	}
-	sort.Strings(parts)
-	return strings.Join(parts, ", ")
-}
-
-func formatSources(src map[string]struct{}) string {
-	if len(src) == 0 {
-		return ""
-	}
-	parts := make([]string, 0, len(src))
-	for k := range src {
-		parts = append(parts, k)
-	}
-	sort.Strings(parts)
-	return strings.Join(parts, ", ")
+	return s[:max-1] + "…"
 }

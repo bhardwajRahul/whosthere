@@ -5,7 +5,10 @@ import (
 	"strings"
 
 	"github.com/derailed/tview"
+	"github.com/ramonvermeulen/whosthere/internal/ui/navigation"
 )
+
+var _ navigation.Page = (*SplashPage)(nil)
 
 var LogoBig = []string{
 	`Knock Knock..                                                     `,
@@ -22,6 +25,9 @@ var LogoBig = []string{
 // SplashPage adapts the splash logo into a Page.
 type SplashPage struct {
 	root *tview.Flex
+}
+
+func (p *SplashPage) Refresh() {
 }
 
 func NewSplashPage() *SplashPage {
@@ -51,8 +57,10 @@ func NewSplashPage() *SplashPage {
 	return s
 }
 
-func (p *SplashPage) GetName() string { return "splash" }
+func (p *SplashPage) GetName() string { return navigation.RouteSplash }
 
 func (p *SplashPage) GetPrimitive() tview.Primitive { return p.root }
 
 func (p *SplashPage) FocusTarget() tview.Primitive { return p.root }
+
+func (p *SplashPage) RefreshFromState() {}

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ramonvermeulen/whosthere/internal/paths"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -56,7 +57,8 @@ func LevelFromEnv(defaultLevel zapcore.Level) zapcore.Level {
 
 // Init sets up a global Zap logger writing JSON to a file.
 // level: zapcore.InfoLevel for prod, zapcore.DebugLevel for dev.
-func Init(appName string, level zapcore.Level) (*zap.Logger, string, error) {
+// enableStdout: if true, also logs to stdout with console format.
+func Init(appName string, level zapcore.Level, enableStdout bool) (*zap.Logger, string, error) {
 	var initErr error
 	once.Do(func() {
 		path, err := resolveLogPath(appName)
@@ -79,27 +81,41 @@ func Init(appName string, level zapcore.Level) (*zap.Logger, string, error) {
 			EncodeDuration: zapcore.StringDurationEncoder,
 			EncodeCaller:   zapcore.ShortCallerEncoder,
 		}
-		encoder := zapcore.NewJSONEncoder(encCfg)
+		jsonEncoder := zapcore.NewJSONEncoder(encCfg)
 
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 		if err != nil {
 			initErr = fmt.Errorf("open log file: %w", err)
 			return
 		}
-		ws := zapcore.AddSync(f)
+		wsFile := zapcore.AddSync(f)
 
-		core := zapcore.NewCore(encoder, ws, level)
+		fileCore := zapcore.NewCore(jsonEncoder, wsFile, level)
+
+		var core zapcore.Core
+		if enableStdout {
+			wsStdout := zapcore.AddSync(os.Stdout)
+			stdoutCore := zapcore.NewCore(jsonEncoder, wsStdout, level)
+			core = zapcore.NewTee(fileCore, stdoutCore)
+		} else {
+			core = fileCore
+		}
+
 		logger = zap.New(core, zap.AddCaller())
 		zap.ReplaceGlobals(logger)
 	})
 	return logger, cachedPath, initErr
 }
 
-// L returns the global logger (no-op if Init wasn't called).
+// L returns the global logger. If Init hasn't been called yet it
+// returns a no-op logger without mutating the global zap logger.
+//
+// This makes accidental logging before initialization cheap and
+// predictable, while keeping Init as the only place that installs
+// a real global logger.
 func L() *zap.Logger {
 	if logger == nil {
-		logger = zap.NewNop()
-		zap.ReplaceGlobals(logger)
+		return zap.NewNop()
 	}
 	return logger
 }
@@ -108,16 +124,8 @@ func L() *zap.Logger {
 func LogPath() string { return cachedPath }
 
 func resolveLogPath(appName string) (string, error) {
-	base := os.Getenv("XDG_STATE_HOME")
-	if base == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		base = filepath.Join(home, ".local", "state")
-	}
-	dir := filepath.Join(base, appName)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	dir, err := paths.StateDir()
+	if err != nil {
 		return "", err
 	}
 	return filepath.Join(dir, "app.log"), nil

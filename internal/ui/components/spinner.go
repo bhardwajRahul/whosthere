@@ -10,14 +10,17 @@ type Spinner struct {
 	view    *tview.TextView
 	stop    chan struct{}
 	running bool
+	suffix  string
 }
 
 func NewSpinner() *Spinner {
 	tv := tview.NewTextView().SetText(" ").SetTextAlign(tview.AlignLeft)
-	return &Spinner{view: tv, stop: make(chan struct{}, 1)}
+	return &Spinner{view: tv, stop: make(chan struct{}, 1), suffix: ""}
 }
 
 func (s *Spinner) View() *tview.TextView { return s.view }
+
+func (s *Spinner) SetSuffix(suf string) { s.suffix = suf }
 
 func (s *Spinner) Start(queue func(f func())) {
 	if s.running {
@@ -44,7 +47,7 @@ func (s *Spinner) Start(queue func(f func())) {
 			case <-time.After(interval):
 				ch := string(frames[idx%len(frames)])
 				idx++
-				queue(func() { s.view.SetText(ch + " Scanning...") })
+				queue(func() { s.view.SetText(ch + s.suffix) })
 			}
 		}
 	}()
@@ -55,7 +58,6 @@ func (s *Spinner) Stop(queue func(f func())) {
 	case s.stop <- struct{}{}:
 	default:
 	}
-	if s.running {
-		queue(func() { s.view.SetText("") })
-	}
+	queue(func() { s.view.SetText("") })
+	s.running = false
 }

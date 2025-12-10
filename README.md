@@ -16,8 +16,21 @@ Here is an example configuration file with all available options and their defau
 
 ```yaml
 splash:
-  enabled: true # Show splash screen on startup
-  delay: 1 # Delay in seconds for the splash screen
+  enabled: true # show splash screen on startup
+  delay: 1      # delay in seconds for the splash screen
+theme:         
+  # maps 1:1 to tview.Theme https://github.com/rivo/tview/blob/master/styles.go#L6
+  primitive_background_color: "#000a1a"
+  contrast_background_color: "#001a33"
+  more_contrast_background_color: "#003366"
+  border_color: "#0088ff"
+  title_color: "#00ffff"
+  graphics_color: "#00ffaa"
+  primary_text_color: "#cceeff"
+  secondary_text_color: "#6699ff"
+  tertiary_text_color: "#ffaa00"
+  inverse_text_color: "#000a1a"
+  contrast_secondary_text_color: "#88ddff"
 ```
 
 ## Logging
@@ -32,3 +45,15 @@ For example, to set the log level to `debug`, you can start whosthere with the f
 WHOSTHERE_LOG=debug whosthere
 ```
 
+## Platforms
+This application has been tested on Linux and macOS. Windows support is not currently available, but contributions
+to add Windows compatibility are welcome!
+
+## Engine
+
+### Scanners
+
+...
+
+### OUI Table
+https://standards-oui.ieee.org/oui/oui.csv

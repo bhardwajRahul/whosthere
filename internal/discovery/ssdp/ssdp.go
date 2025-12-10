@@ -22,6 +22,8 @@ const (
 	HeaderMX      = 2
 )
 
+var _ discovery.Scanner = (*Scanner)(nil)
+
 // Scanner implements SSDP discovery (UPnP) via manual M-SEARCH over UDP.
 // Implemented as described in the RFC: https://datatracker.ietf.org/doc/html/draft-cai-ssdp-v1-03#section-4.1
 type Scanner struct{}

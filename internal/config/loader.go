@@ -8,43 +8,42 @@ import (
 	"path/filepath"
 
 	"github.com/goccy/go-yaml"
+	"github.com/ramonvermeulen/whosthere/internal/paths"
 )
 
 const (
-	defaultConfigDirName  = "whosthere"
 	defaultConfigFileName = "config.yaml"
 	// Environment variable to override config file path
 	configEnvVar = "WHOSTHERE_CONFIG"
-	xdgConfigEnv = "XDG_CONFIG_HOME"
 )
 
 // Load resolves the config path, reads/creates YAML, and returns the merged config.
-func Load(pathOverride string) (*Config, string, error) {
+func Load(pathOverride string) (*Config, error) {
 	resolvedPath, err := resolveConfigPath(pathOverride)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	cfg := DefaultConfig()
 
 	if err := ensureConfigFile(resolvedPath, cfg); err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	raw, err := os.ReadFile(resolvedPath)
 	if err != nil {
-		return cfg, "", fmt.Errorf("read config: %w", err)
+		return cfg, fmt.Errorf("read config: %w", err)
 	}
 
 	if err := yaml.Unmarshal(raw, cfg); err != nil {
-		return cfg, "", fmt.Errorf("parse config: %w", err)
+		return cfg, fmt.Errorf("parse config: %w", err)
 	}
 
 	if cfg.Splash.Delay < 0 {
 		cfg.Splash.Delay = DefaultSplashDelay
 	}
 
-	return cfg, resolvedPath, nil
+	return cfg, nil
 }
 
 func ensureConfigFile(path string, defaults *Config) error {
@@ -80,14 +79,10 @@ func resolveConfigPath(pathOverride string) (string, error) {
 		return env, nil
 	}
 
-	base := os.Getenv(xdgConfigEnv)
-	if base == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("resolve home dir: %w", err)
-		}
-		base = filepath.Join(home, ".config")
+	dir, err := paths.ConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve config dir: %w", err)
 	}
 
-	return filepath.Join(base, defaultConfigDirName, defaultConfigFileName), nil
+	return filepath.Join(dir, defaultConfigFileName), nil
 }
