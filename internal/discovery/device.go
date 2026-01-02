@@ -21,23 +21,28 @@ import (
 // Device represents a discovered network device aggregated from multiple scanners.
 type Device struct {
 	IP           net.IP              // Primary IP address (identity key)
-	MAC          string              // MAC if known
-	DisplayName  string              // Reverse DNS or reported name
-	Manufacturer string              // Vendor from OUI or protocol metadata
-	Model        string              // Reported model
+	MAC          string              // MAC address of the device
+	DisplayName  string              // Most user-friendly name discovered
+	Manufacturer string              // Vendor from OUI table
 	Services     map[string]int      // service name -> port (or 0 if unknown)
-	Sources      map[string]struct{} // scanners that contributed info
+	Sources      map[string]struct{} // set of scanners that contributed info
+	FirstSeen    time.Time           // first time any scanner saw the device
 	LastSeen     time.Time           // last time any scanner saw the device
-	Extras       map[string]string   // additional key/value metadata discovered from protocols (TXT, SSDP, etc.)
+	ExtraData    map[string]string   // additional key/value metadata discovered from protocols
 }
 
-// NewDevice builds a Device with initialized maps and current timestamp as last seen.
+// NewDevice builds a Device with initialized maps and current timestamp as first/last seen.
 func NewDevice(ip net.IP) Device {
-	return Device{IP: ip, Services: map[string]int{}, Sources: map[string]struct{}{}, LastSeen: time.Now(), Extras: map[string]string{}}
+	now := time.Now()
+	return Device{IP: ip, Services: map[string]int{}, Sources: map[string]struct{}{}, FirstSeen: now, LastSeen: now, ExtraData: map[string]string{}}
 }
 
-// Merge merges fields from 'other' into d, preferring non-empty/newer data and unioning maps.
-func (d *Device) Merge(other Device) {
+// Merge merges fields into an existing Device
+func (d *Device) Merge(other *Device) {
+	// todo allow for more advanced merge strategies per field?
+	if other == nil {
+		return
+	}
 	if d.IP == nil && other.IP != nil {
 		d.IP = other.IP
 	}
@@ -49,9 +54,6 @@ func (d *Device) Merge(other Device) {
 	}
 	if d.Manufacturer == "" && other.Manufacturer != "" {
 		d.Manufacturer = other.Manufacturer
-	}
-	if d.Model == "" && other.Model != "" {
-		d.Model = other.Model
 	}
 	if d.Services == nil {
 		d.Services = map[string]int{}
@@ -69,14 +71,17 @@ func (d *Device) Merge(other Device) {
 	for src := range other.Sources {
 		d.Sources[src] = struct{}{}
 	}
-	if d.Extras == nil {
-		d.Extras = map[string]string{}
+	if d.ExtraData == nil {
+		d.ExtraData = map[string]string{}
 	}
-	for k, v := range other.Extras {
-		// prefer existing value; only set if missing
-		if _, ok := d.Extras[k]; !ok {
-			d.Extras[k] = v
+	for k, v := range other.ExtraData {
+		// prefer existing value, only set if missing
+		if _, ok := d.ExtraData[k]; !ok {
+			d.ExtraData[k] = v
 		}
+	}
+	if d.FirstSeen.IsZero() || (!other.FirstSeen.IsZero() && other.FirstSeen.Before(d.FirstSeen)) {
+		d.FirstSeen = other.FirstSeen
 	}
 	if other.LastSeen.After(d.LastSeen) {
 		d.LastSeen = other.LastSeen

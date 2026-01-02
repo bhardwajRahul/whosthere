@@ -2,7 +2,6 @@ package arp
 
 import (
 	"context"
-	"sync"
 
 	"github.com/ramonvermeulen/whosthere/internal/discovery"
 	"go.uber.org/zap"
@@ -10,36 +9,28 @@ import (
 
 var _ discovery.Scanner = (*Scanner)(nil)
 
-// Scanner implements ARP-based discovery.
-// On first run, it triggers ARP requests for the entire /24 subnet.
-// On subsequent runs, it triggers a lightweight refresh before reading the ARP cache.
+// Scanner implements ARP-based discovery by reading the ARP cache.
+// Optional Sweeper can populate the cache in the background.
 type Scanner struct {
-	firstRunDone bool
-	firstRunLock sync.Mutex
+	Sweeper Sweeper
 
 	logger *zap.Logger
+}
+
+func NewScanner(sweeper Sweeper) *Scanner {
+	return &Scanner{Sweeper: sweeper}
 }
 
 func (s *Scanner) Name() string { return "arp" }
 
 // Scan performs ARP discovery.
-// On first call: triggers ARP for entire /24 subnet, then reads cache.
-// On subsequent calls: performs a short trigger, waits briefly, then reads cache.
 func (s *Scanner) Scan(ctx context.Context, out chan<- discovery.Device) error {
 	if s.logger == nil {
 		s.logger = zap.L().With(zap.String("scanner", s.Name()))
 	}
 
-	s.firstRunLock.Lock()
-	isFirstRun := !s.firstRunDone
-	if isFirstRun {
-		s.firstRunDone = true
-	}
-	s.firstRunLock.Unlock()
-
-	if isFirstRun {
-		s.logger.Info("First ARP scan - triggering full subnet sweep")
-		go s.triggerFullSubnetSweep()
+	if s.Sweeper != nil {
+		s.Sweeper.Start(context.Background())
 	}
 
 	return s.readARPCache(ctx, out)

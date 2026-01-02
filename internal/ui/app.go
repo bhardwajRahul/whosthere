@@ -37,16 +37,22 @@ func (a *App) UIQueue() func(func()) {
 }
 
 func NewApp(cfg *config.Config, ouiDB *oui.Registry) *App {
-	_ = theme.FromConfig(cfg.Theme)
+	var themeCfg *config.ThemeConfig
+	if cfg != nil {
+		themeCfg = &cfg.Theme
+	}
+	_ = theme.FromConfig(themeCfg)
+	sweeper := arp.NewSweeper(5*time.Minute, time.Minute)
 	scanners := []discovery.Scanner{
 		&ssdp.Scanner{},
-		&arp.Scanner{},
+		arp.NewScanner(sweeper),
 		&mdns.Scanner{},
 	}
 	engine := discovery.NewEngine(
 		scanners,
 		discovery.WithTimeout(cfg.ScanDuration),
 		discovery.WithOUIRegistry(ouiDB),
+		discovery.WithSubnetHook(sweeper.Trigger),
 	)
 
 	a := &App{
@@ -133,7 +139,7 @@ func (a *App) startDiscoveryScanLoop() {
 			ctx := context.Background()
 			cctx, cancel := context.WithTimeout(ctx, a.cfg.ScanDuration)
 			_, _ = a.engine.Stream(cctx, func(d discovery.Device) {
-				a.state.UpsertDevice(d)
+				a.state.UpsertDevice(&d)
 			})
 			cancel()
 			mp.Spinner().Stop(a.UIQueue())

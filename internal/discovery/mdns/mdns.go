@@ -86,7 +86,9 @@ func (ss *scanSession) run(ctx context.Context, out chan<- discovery.Device) err
 	if err := ss.setupConnection(); err != nil {
 		return fmt.Errorf("setup connection: %w", err)
 	}
-	defer ss.conn.Close()
+	defer func() {
+		_ = ss.conn.Close()
+	}()
 
 	ss.queriedServiceTypes = make(map[string]bool)
 	ss.reportedDevices = make(map[string]bool)
@@ -137,7 +139,7 @@ func (ss *scanSession) readAndProcessPacket(buffer []byte, out chan<- discovery.
 		return false, nil
 	}
 
-	if !dnsMsg.Header.Response {
+	if !dnsMsg.Response {
 		return false, nil
 	}
 
@@ -161,7 +163,7 @@ func (ss *scanSession) processDNSResponse(msg *dnsmessage.Message, sender *net.U
 				ss.handleDiscoveredServiceType(ptrValue)
 			} else {
 				// This is a device announcement (e.g., "My Device._http._tcp.local")
-				ss.handleDiscoveredDevice(answer, ptrValue, sender, out)
+				ss.handleDiscoveredDevice(&answer, ptrValue, sender, out)
 			}
 		}
 	}
@@ -185,7 +187,7 @@ func (ss *scanSession) handleDiscoveredServiceType(serviceType string) {
 }
 
 func (ss *scanSession) handleDiscoveredDevice(
-	answer dnsmessage.Resource,
+	answer *dnsmessage.Resource,
 	ptrValue string,
 	sender *net.UDPAddr,
 	out chan<- discovery.Device,
@@ -196,12 +198,15 @@ func (ss *scanSession) handleDiscoveredDevice(
 		return
 	}
 
+	now := time.Now()
 	device := &discovery.Device{
 		IP:          sender.IP,
 		DisplayName: cleanDisplayName(ptrValue),
 		Services:    make(map[string]int),
 		Sources:     map[string]struct{}{"mdns": {}},
-		LastSeen:    time.Now(),
+		ExtraData:   make(map[string]string),
+		FirstSeen:   now,
+		LastSeen:    now,
 	}
 
 	if service := extractServiceName(answer.Header.Name.String()); service != "" {
@@ -252,25 +257,21 @@ func (ss *scanSession) parseTXTRecords(txt *dnsmessage.TXTResource, device *disc
 			value := text[idx+1:]
 
 			switch key {
-			case "model":
-				device.Model = value
 			case "manufacturer":
 				device.Manufacturer = value
-			case "ty":
-				if device.Model == "" {
-					device.Model = value
-				}
-			case "product":
-				if device.Model == "" {
-					device.Model = cleanProductName(value)
-				}
 			case "mac":
 				device.MAC = value
 			default:
-				device.Extras[key] = value
+				if device.ExtraData == nil {
+					device.ExtraData = make(map[string]string)
+				}
+				device.ExtraData[key] = value
 			}
 		} else {
-			device.Extras[text] = "true"
+			if device.ExtraData == nil {
+				device.ExtraData = make(map[string]string)
+			}
+			device.ExtraData[text] = "true"
 		}
 	}
 }
@@ -291,12 +292,6 @@ func isTimeout(err error) bool {
 func cleanDisplayName(name string) string {
 	name = strings.TrimSuffix(name, ".local.")
 	return strings.TrimSuffix(name, ".")
-}
-
-func cleanProductName(name string) string {
-	name = strings.TrimPrefix(name, "(")
-	name = strings.TrimSuffix(name, ")")
-	return name
 }
 
 func extractServiceName(dnsName string) string {

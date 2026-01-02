@@ -2,9 +2,12 @@ package pages
 
 import (
 	"fmt"
+	"sort"
+	"time"
 
 	"github.com/derailed/tcell/v2"
 	"github.com/derailed/tview"
+	"github.com/ramonvermeulen/whosthere/internal/discovery"
 	"github.com/ramonvermeulen/whosthere/internal/state"
 	"github.com/ramonvermeulen/whosthere/internal/ui/navigation"
 )
@@ -35,6 +38,11 @@ func NewDetailPage(s *state.AppState, navigate func(route string), uiQueue func(
 	p := &DetailPage{Flex: main, state: s, info: info, navigate: navigate}
 
 	info.SetInputCapture(handleInput(p))
+	s.AddListener(func(d discovery.Device) {
+		if p.state.SelectedIP() == d.IP.String() {
+			uiQueue(p.Refresh)
+		}
+	})
 
 	p.Refresh()
 	return p
@@ -43,7 +51,7 @@ func NewDetailPage(s *state.AppState, navigate func(route string), uiQueue func(
 func handleInput(p *DetailPage) func(ev *tcell.EventKey) *tcell.EventKey {
 	return func(ev *tcell.EventKey) *tcell.EventKey {
 		if ev == nil {
-			return ev
+			return nil
 		}
 		switch {
 		case ev.Key() == tcell.KeyEsc || ev.Rune() == 'q':
@@ -72,19 +80,35 @@ func (p *DetailPage) Refresh() {
 
 	labelColor := colorToHexTag(tview.Styles.SecondaryTextColor)
 	valueColor := colorToHexTag(tview.Styles.PrimaryTextColor)
+	formatTime := func(t time.Time) string {
+		if t.IsZero() {
+			return ""
+		}
+		return t.Format("2006-01-02 15:04:05")
+	}
 
 	_, _ = fmt.Fprintf(p.info, "[%s::b]IP:[-::-] [%s::]%s[-::-]\n", labelColor, valueColor, d.IP)
-	_, _ = fmt.Fprintf(p.info, "[%s::b]DisplayName:[-::-] [%s::]%s[-::-]\n", labelColor, valueColor, d.DisplayName)
+	_, _ = fmt.Fprintf(p.info, "[%s::b]Display Name:[-::-] [%s::]%s[-::-]\n", labelColor, valueColor, d.DisplayName)
 	_, _ = fmt.Fprintf(p.info, "[%s::b]MAC:[-::-] [%s::]%s[-::-]\n", labelColor, valueColor, d.MAC)
 	_, _ = fmt.Fprintf(p.info, "[%s::b]Manufacturer:[-::-] [%s::]%s[-::-]\n", labelColor, valueColor, d.Manufacturer)
-	_, _ = fmt.Fprintf(p.info, "[%s::b]Model:[-::-] [%s::]%s[-::-]\n\n", labelColor, valueColor, d.Model)
+	_, _ = fmt.Fprintf(p.info, "[%s::b]First Seen:[-::-] [%s::]%s[-::-]\n", labelColor, valueColor, formatTime(d.FirstSeen))
+	_, _ = fmt.Fprintf(p.info, "[%s::b]Last Seen:[-::-] [%s::]%s[-::-]\n\n", labelColor, valueColor, formatTime(d.LastSeen))
 
 	_, _ = fmt.Fprintf(p.info, "[%s::b]Sources:[-::-]\n", labelColor)
 	if len(d.Sources) == 0 {
 		_, _ = fmt.Fprintln(p.info, "  (none)")
 	} else {
-		for src := range d.Sources {
+		for _, src := range sortedKeys(d.Sources) {
 			_, _ = fmt.Fprintf(p.info, "  %s\n", src)
+		}
+	}
+
+	_, _ = fmt.Fprintf(p.info, "\n[%s::b]Extra Data:[-::-]\n", labelColor)
+	if len(d.ExtraData) == 0 {
+		_, _ = fmt.Fprintln(p.info, "  (none)")
+	} else {
+		for _, k := range sortedKeys(d.ExtraData) {
+			_, _ = fmt.Fprintf(p.info, "  %s: %s\n", k, d.ExtraData[k])
 		}
 	}
 }
@@ -93,4 +117,14 @@ func (p *DetailPage) Refresh() {
 func colorToHexTag(c tcell.Color) string {
 	r, g, b := c.RGB()
 	return fmt.Sprintf("#%02x%02x%02x", r, g, b)
+}
+
+// sortedKeys is a helper to return asc sorted map keys.
+func sortedKeys[T any](m map[string]T) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }

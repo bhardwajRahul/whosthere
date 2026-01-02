@@ -1,15 +1,67 @@
 # whosthere
 
-Whosthere is a TUI application that discovers devices and services on your local network, built in Go for fast, 
-concurrent scanning and a clean terminal interface. I'm building this primarily for myself to deepen my understanding
-of Golang and networking fundamentals. Feel free to use it, contribute to it, or suggest features! I'm open to all kinds
-of suggestions and feedback.
+Knock knock.. Who's there? 🚪
+
+Whosthere is a TUI network scanner written in Go that quickly discovers devices and services on your local network.
+It's built for fast, concurrent scans and designed to run without `sudo` by using normal user‑space network requests (
+e.g., TCP/UDP connects and multicast queries).
+Pluggable scanners run concurrently and feed a central engine that merges results and enriches device manufacturer
+information via an [**OUI registry**](https://standards-oui.ieee.org/).
+
+I am by no means a network expert, and mainly built this application to learn more about networking and concurrency in
+Go.
+Feel free to raise feature requests, open issues, or contribute code! I will try my best to review and merge
+contributions.
+
+## Installation
+
+You can download precompiled binaries for Linux and macOS from the [releases page](tbd), or simply install via your OS
+package manager if available.
+
+TODO(ramon): start with install script instead, later on introduce all package managers
+
+### Homebrew (macOS/Linux)
+
+```bash
+brew install whosthere
+```
+
+### apt (Debian/Ubuntu)
+
+```bash
+apt install whosthere
+```
+
+### yum (Fedora/CentOS)
+
+```bash
+yum install whosthere
+```
+
+### pacman (Arch Linux)
+
+```bash
+pacman -S whosthere
+```
+
+### From source
+
+Make sure you have [Go](https://golang.org/dl/) installed.
+
+```bash
+go install github.com/yourusername/whosthere@latest
+```
 
 ## Configuration
-A lot of behavior within whosthere can be configured to your liking. By default, whosthere will try to look for a configuration
-file at `$XDG_CONFIG_HOME/whosthere/config.yaml`, or `~/.config/whosthere/config.yaml` if the [**XDG Base Directory**](https://specifications.freedesktop.org/basedir/latest/#basics)
-environment variables are not set. If no configuration file is found, whosthere will create one with default values on first run.
-The location of the configuration file can be overridden by providing the `--config` (`-c`) flag when starting whosthere, 
+
+A lot of behavior within whosthere can be configured to your liking. By default, whosthere will try to look for a
+configuration
+file at `$XDG_CONFIG_HOME/whosthere/config.yaml`, or `~/.config/whosthere/config.yaml` if the [**XDG Base Directory
+**](https://specifications.freedesktop.org/basedir/latest/#basics)
+environment variables are not set. If no configuration file is found, whosthere will create one with default values on
+first run.
+The location of the configuration file can be overridden by providing the `--config` (`-c`) flag when starting
+whosthere,
 or the `WHOSTHERE_CONFIG` environment variable.
 
 Here is an example configuration file with all available options and their default values:
@@ -18,7 +70,7 @@ Here is an example configuration file with all available options and their defau
 splash:
   enabled: true # show splash screen on startup
   delay: 1      # delay in seconds for the splash screen
-theme:         
+theme:
   # maps 1:1 to tview.Theme https://github.com/rivo/tview/blob/master/styles.go#L6
   primitive_background_color: "#000a1a"
   contrast_background_color: "#001a33"
@@ -34,10 +86,12 @@ theme:
 ```
 
 ## Logging
+
 Whosthere supports logging to a file for debugging and monitoring purposes. By default, logs are written to
-`$XDG_STATE_HOME/whosthere/whosthere.log`, or `~/.local/state/whosthere/whosthere.log` if the [**XDG Base Directory**](https://specifications.freedesktop.org/basedir/latest/#basics)
+`$XDG_STATE_HOME/whosthere/whosthere.log`, or `~/.local/state/whosthere/whosthere.log` if the [**XDG Base Directory
+**](https://specifications.freedesktop.org/basedir/latest/#basics)
 environment variables are not set. The log level is set to `info` by default, but can be changed via the `WHOSTHERE_LOG`
-environment variable. 
+environment variable.
 
 For example, to set the log level to `debug`, you can start whosthere with the following command:
 
@@ -46,6 +100,7 @@ WHOSTHERE_LOG=debug whosthere
 ```
 
 ## Platforms
+
 This application has been tested on Linux and macOS. Windows support is not currently available, but contributions
 to add Windows compatibility are welcome!
 
@@ -56,4 +111,5 @@ to add Windows compatibility are welcome!
 ...
 
 ### OUI Table
+
 https://standards-oui.ieee.org/oui/oui.csv

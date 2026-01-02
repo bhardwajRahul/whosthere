@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"net"
 	"sync"
 	"time"
 
@@ -20,6 +21,8 @@ type Engine struct {
 	Scanners    []Scanner
 	Timeout     time.Duration
 	OUIRegistry *oui.Registry
+	OnSubnet    func(*net.IPNet)
+	Subnets     *SubnetRegistry
 }
 
 type EngineOption func(*Engine)
@@ -36,11 +39,17 @@ func NewEngine(scanners []Scanner, opts ...EngineOption) *Engine {
 	e := &Engine{
 		Scanners: scanners,
 		Timeout:  6 * time.Second,
+		Subnets:  NewSubnetRegistry(),
 	}
 	for _, opt := range opts {
 		opt(e)
 	}
 	return e
+}
+
+// WithSubnetHook allows callers to receive subnet hints for each device.
+func WithSubnetHook(f func(*net.IPNet)) EngineOption {
+	return func(e *Engine) { e.OnSubnet = f }
 }
 
 // fillManufacturerIfEmpty fills the Manufacturer field of the device using OUI lookup if it's empty.
@@ -105,15 +114,25 @@ func (e *Engine) Stream(ctx context.Context, onDevice func(Device)) ([]Device, e
 				// skip devices with no IP
 				continue
 			}
+			if e.OnSubnet != nil {
+				if sn := ipv4Subnet24(d.IP); sn != nil {
+					if e.Subnets == nil || e.Subnets.Add(sn) {
+						e.OnSubnet(sn)
+					}
+				}
+			}
 			key := d.IP.String()
 			if existing, found := devices[key]; found {
-				existing.Merge(d)
+				existing.Merge(&d)
 				e.fillManufacturerIfEmpty(existing)
 				if onDevice != nil {
 					onDevice(*existing)
 				}
 			} else {
 				dev := d
+				if dev.FirstSeen.IsZero() {
+					dev.FirstSeen = time.Now()
+				}
 				e.fillManufacturerIfEmpty(&dev)
 				devices[key] = &dev
 				if onDevice != nil {
@@ -130,4 +149,15 @@ func mapToSlice(m map[string]*Device) []Device {
 		res = append(res, *v)
 	}
 	return res
+}
+
+func ipv4Subnet24(ip net.IP) *net.IPNet {
+	if ip == nil {
+		return nil
+	}
+	if ip4 := ip.To4(); ip4 != nil {
+		// Convert to 24-bit subnet mask
+		return &net.IPNet{IP: ip4.Mask(net.CIDRMask(24, 32)), Mask: net.CIDRMask(24, 32)}
+	}
+	return nil
 }

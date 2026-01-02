@@ -108,11 +108,20 @@ func handlePacket(out chan<- discovery.Device, src *net.UDPAddr, payload []byte,
 		log.Debug("ssdp response skipped; no ip", zap.String("src", src.String()), zap.String("location", loc))
 		return
 	}
-	dd := discovery.NewDevice(ip)
-	dd.DisplayName = server
-	dd.Services["upnp"] = 0
-	dd.Sources["ssdp"] = struct{}{}
-	out <- dd
+	d := discovery.NewDevice(ip)
+	d.DisplayName = server
+	d.Services["upnp"] = 0
+	d.Sources["ssdp"] = struct{}{}
+	if d.ExtraData == nil {
+		d.ExtraData = make(map[string]string)
+	}
+	if loc != "" {
+		d.ExtraData["location"] = loc
+	}
+	if server != "" {
+		d.ExtraData["server"] = server
+	}
+	out <- d
 }
 
 // parseHeaders extracts LOCATION and SERVER using HTTP-like header parsing.

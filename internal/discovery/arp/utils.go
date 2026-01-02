@@ -1,8 +1,13 @@
 package arp
 
 import (
+	"errors"
 	"fmt"
 	"net"
+)
+
+var (
+	ErrNoIPv4Interface = errors.New("arp: no IPv4 network interface found")
 )
 
 // getLocalNetwork returns local IPv4 address and subnet.

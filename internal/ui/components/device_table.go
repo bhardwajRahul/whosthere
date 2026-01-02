@@ -32,20 +32,22 @@ func NewDeviceTable() *DeviceTable {
 }
 
 // Upsert merges device and refreshes table UI.
-func (dt *DeviceTable) Upsert(d discovery.Device) {
+func (dt *DeviceTable) Upsert(d *discovery.Device) {
 	key := ""
-	if d.IP != nil {
-		key = d.IP.String()
-	}
-	if key == "" {
+	if d == nil || d.IP == nil {
 		zap.L().Debug("skipping device with no IP", zap.Any("device", d))
+		return
+	}
+	key = d.IP.String()
+	if key == "" {
+		zap.L().Debug("skipping device with empty IP", zap.Any("device", d))
 		return
 	}
 	if existing, ok := dt.devices[key]; ok {
 		existing.Merge(d)
 		dt.devices[key] = existing
 	} else {
-		dt.devices[key] = d
+		dt.devices[key] = *d
 	}
 	dt.refresh()
 }
@@ -95,7 +97,7 @@ func (dt *DeviceTable) SelectLast() {
 }
 
 type tableRow struct {
-	ip, hostname, mac, manufacturer, model, lastSeen string
+	ip, hostname, mac, manufacturer, lastSeen string
 }
 
 func (dt *DeviceTable) buildRows() []tableRow {
@@ -106,7 +108,6 @@ func (dt *DeviceTable) buildRows() []tableRow {
 			hostname:     d.DisplayName,
 			mac:          d.MAC,
 			manufacturer: d.Manufacturer,
-			model:        d.Model,
 			lastSeen:     fmtDuration(time.Since(d.LastSeen)),
 		})
 	}
@@ -118,7 +119,7 @@ func (dt *DeviceTable) refresh() {
 	dt.Clear()
 	const maxColWidth = 30
 
-	headers := []string{"IP", "DisplayName", "MAC", "Manufacturer", "Model", "Last Seen"}
+	headers := []string{"IP", "Display Name", "MAC", "Manufacturer", "Last Seen"}
 
 	for i, h := range headers {
 		text := truncate(h, maxColWidth)
@@ -137,15 +138,13 @@ func (dt *DeviceTable) refresh() {
 		hostText := truncate(rowData.hostname, maxColWidth)
 		macText := truncate(rowData.mac, maxColWidth)
 		manuText := truncate(rowData.manufacturer, maxColWidth)
-		modelText := truncate(rowData.model, maxColWidth)
 		seenText := truncate(rowData.lastSeen, maxColWidth)
 
 		dt.SetCell(r, 0, tview.NewTableCell(ipText).SetExpansion(1))
 		dt.SetCell(r, 1, tview.NewTableCell(hostText).SetExpansion(1))
 		dt.SetCell(r, 2, tview.NewTableCell(macText).SetExpansion(1))
 		dt.SetCell(r, 3, tview.NewTableCell(manuText).SetExpansion(1))
-		dt.SetCell(r, 4, tview.NewTableCell(modelText).SetExpansion(1))
-		dt.SetCell(r, 5, tview.NewTableCell(seenText).SetExpansion(1))
+		dt.SetCell(r, 4, tview.NewTableCell(seenText).SetExpansion(1))
 	}
 }
 
@@ -159,12 +158,12 @@ func fmtDuration(d time.Duration) string {
 	return fmt.Sprintf("%dm", int(d/time.Minute))
 }
 
-func truncate(s string, max int) string {
-	if max <= 0 || len(s) <= max {
+func truncate(s string, maxLen int) string {
+	if maxLen <= 0 || len(s) <= maxLen {
 		return s
 	}
-	if max <= 1 {
-		return s[:max]
+	if maxLen <= 1 {
+		return s[:maxLen]
 	}
-	return s[:max-1] + "…"
+	return s[:maxLen-1] + "…"
 }

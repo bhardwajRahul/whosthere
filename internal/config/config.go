@@ -6,8 +6,8 @@ const (
 	DefaultSplashEnabled = true
 	DefaultSplashDelay   = float32(1.0)
 
-	DefaultScanInterval = 30 * time.Second
-	DefaultScanDuration = 15 * time.Second
+	DefaultScanInterval = 20 * time.Second
+	DefaultScanDuration = 10 * time.Second
 )
 
 // ThemeConfig mirrors tview.Theme; all fields are optional strings that

@@ -10,8 +10,12 @@ import (
 
 // FromConfig starts from the current tview.Styles and applies
 // any overrides from ThemeConfig. It returns the resulting tview.Theme.
-func FromConfig(tc config.ThemeConfig) tview.Theme {
+func FromConfig(tc *config.ThemeConfig) tview.Theme {
 	th := tview.Styles
+
+	if tc == nil {
+		return th
+	}
 
 	if c := parseColor(tc.PrimitiveBackgroundColor); c != nil {
 		th.PrimitiveBackgroundColor = *c

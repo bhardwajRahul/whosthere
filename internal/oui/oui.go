@@ -100,7 +100,7 @@ func (reg *Registry) Refresh(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, clientTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, updateURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, updateURL, http.NoBody)
 	if err != nil {
 		return err
 	}

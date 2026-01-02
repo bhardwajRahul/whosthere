@@ -46,17 +46,18 @@ Examples:
 		}
 
 		var scList []discovery.Scanner
+		sweeper := arp.NewSweeper(5*time.Minute, time.Minute)
 		requested := strings.Split(scannerNames, ",")
 		for _, r := range requested {
 			r = strings.TrimSpace(strings.ToLower(r))
 			switch r {
 			case "", "all":
 				// add all
-				scList = append(scList, &ssdp.Scanner{}, &arp.Scanner{}, &mdns.Scanner{})
+				scList = append(scList, &ssdp.Scanner{}, arp.NewScanner(sweeper), &mdns.Scanner{})
 			case "ssdp":
 				scList = append(scList, &ssdp.Scanner{})
 			case "arp":
-				scList = append(scList, &arp.Scanner{})
+				scList = append(scList, arp.NewScanner(sweeper))
 			case "mdns":
 				scList = append(scList, &mdns.Scanner{})
 			default:
@@ -68,7 +69,7 @@ Examples:
 			return fmt.Errorf("no scanners selected")
 		}
 
-		eng := discovery.NewEngine(scList, discovery.WithTimeout(time.Duration(timeoutSec)*time.Second), discovery.WithOUIRegistry(ouiDB))
+		eng := discovery.NewEngine(scList, discovery.WithTimeout(time.Duration(timeoutSec)*time.Second), discovery.WithOUIRegistry(ouiDB), discovery.WithSubnetHook(sweeper.Trigger))
 
 		ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
 		defer cancel()

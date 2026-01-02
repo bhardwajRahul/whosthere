@@ -28,8 +28,8 @@ func (s *Spinner) Start(queue func(f func())) {
 	}
 	s.running = true
 
-	frames := []rune{'|', '/', '-', '\\'}
-	interval := 120 * time.Millisecond
+	frames := []rune{'⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'}
+	interval := 100 * time.Millisecond
 
 	select {
 	case <-s.stop:

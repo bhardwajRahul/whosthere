@@ -55,7 +55,7 @@ func (s *Scanner) readDarwinARPCacheRaw() ([]Entry, error) {
 				}
 			case *route.LinkAddr:
 				if mac == nil && len(v.Addr) >= 6 {
-					mac = net.HardwareAddr(v.Addr[:6])
+					mac = v.Addr[:6]
 				}
 			}
 		}
