@@ -28,7 +28,7 @@ type DeviceTable struct {
 	onSearchStatus func(SearchStatus)
 }
 
-// SearchStatus describes the current regex search UI state for consumers.
+// SearchStatus describes the current regex search UI state.
 type SearchStatus struct {
 	Showing bool        // whether the search bar should be shown
 	Text    string      // text to render in the search bar
@@ -61,48 +61,57 @@ func (dt *DeviceTable) HandleInput(ev *tcell.EventKey) *tcell.EventKey {
 	}
 
 	if dt.searching {
-		switch ev.Key() {
-		case tcell.KeyEnter:
-			dt.searching = false
-			dt.emitStatus()
-			return ev // allow Enter to trigger selection
-		case tcell.KeyEsc:
-			dt.searching = false
-			dt.emitStatus()
-			return nil
-		case tcell.KeyBackspace, tcell.KeyBackspace2:
-			if len(dt.searchInput) > 0 {
-				dt.searchInput = dt.searchInput[:len(dt.searchInput)-1]
-				dt.applySearch(dt.searchInput)
-				return nil
-			}
-			dt.searching = false
-			dt.searchInput = ""
-			_ = dt.SetFilter("")
-			dt.emitStatus()
-			return nil
-		default:
-			if r := ev.Rune(); r != 0 {
-				dt.searchInput += string(r)
-				dt.applySearch(dt.searchInput)
-				return nil
-			}
-		}
-		return nil
+		return dt.handleSearchKey(ev)
 	}
+	return dt.handleNormalKey(ev)
+}
 
-	// Normal mode shortcuts.
+// handleSearchKey processes keys while in regex search mode.
+func (dt *DeviceTable) handleSearchKey(ev *tcell.EventKey) *tcell.EventKey {
+	switch ev.Key() {
+	case tcell.KeyEnter:
+		dt.searching = false
+		// this allows the Enter key to propagate and trigger selection
+		return ev
+	case tcell.KeyEsc:
+		dt.searching = false
+		return nil
+	case tcell.KeyBackspace, tcell.KeyBackspace2:
+		if len(dt.searchInput) > 0 {
+			dt.searchInput = dt.searchInput[:len(dt.searchInput)-1]
+			dt.applySearch(dt.searchInput)
+			return nil
+		}
+		dt.searching = false
+		dt.searchInput = ""
+		_ = dt.SetFilter("")
+		return nil
+	default:
+		if r := ev.Rune(); r != 0 {
+			dt.searchInput += string(r)
+			dt.applySearch(dt.searchInput)
+			return nil
+		}
+	}
+	return nil
+}
+
+// handleNormalKey processes keys while in normal mode.
+func (dt *DeviceTable) handleNormalKey(ev *tcell.EventKey) *tcell.EventKey {
 	switch {
 	case ev.Key() == tcell.KeyEsc:
 		if dt.filterPattern != "" {
 			_ = dt.SetFilter("")
-			dt.emitStatus()
 			return nil
 		}
 		return ev
 	case ev.Rune() == '/':
 		dt.searching = true
-		dt.searchInput = ""
+		if dt.filterPattern != "" {
+			dt.searchInput = dt.filterPattern
+		} else {
+			dt.searchInput = ""
+		}
 		dt.filterError = false
 		dt.emitStatus()
 		return nil
@@ -112,9 +121,9 @@ func (dt *DeviceTable) HandleInput(ev *tcell.EventKey) *tcell.EventKey {
 	case ev.Rune() == 'G':
 		dt.SelectLast()
 		return nil
+	default:
+		return ev
 	}
-
-	return ev
 }
 
 // OnSearchStatus registers a callback for search status changes.
@@ -303,27 +312,27 @@ func (dt *DeviceTable) emitStatusWith(input string) {
 	if dt.onSearchStatus == nil {
 		return
 	}
-	show := dt.searching
-	txt := ""
-	if show {
-		disp := input
-		if disp == "" {
-			disp = "/"
-		}
-		txt = "Regex Search: " + disp
-	}
-	color := tview.Styles.PrimaryTextColor
-	if dt.filterError {
-		color = tcell.ColorRed
-	}
+
 	status := SearchStatus{
-		Showing: show,
-		Text:    txt,
-		Color:   color,
+		Showing: dt.searching,
 		Active:  dt.filterPattern != "",
 		Filter:  dt.filterPattern,
 		Error:   dt.filterError,
+		Color:   tview.Styles.PrimaryTextColor,
 	}
+
+	if status.Error {
+		status.Color = tcell.ColorRed
+	}
+
+	if status.Showing {
+		prefix := "/"
+		if input != "" {
+			prefix += input
+		}
+		status.Text = "Regex Search: " + prefix
+	}
+
 	dt.onSearchStatus(status)
 }
 
