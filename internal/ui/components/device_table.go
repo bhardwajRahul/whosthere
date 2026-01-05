@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/derailed/tcell/v2"
 	"github.com/derailed/tview"
 	"github.com/ramonvermeulen/whosthere/internal/discovery"
 	"go.uber.org/zap"
@@ -18,6 +19,23 @@ type DeviceTable struct {
 	devices       map[string]discovery.Device
 	filterPattern string
 	filterRE      *regexp.Regexp
+
+	// live search state
+	searching   bool
+	searchInput string
+	filterError bool
+
+	onSearchStatus func(SearchStatus)
+}
+
+// SearchStatus describes the current regex search UI state for consumers.
+type SearchStatus struct {
+	Showing bool        // whether the search bar should be shown
+	Text    string      // text to render in the search bar
+	Color   tcell.Color // text color (e.g., red on error)
+	Active  bool        // whether a filter is applied
+	Filter  string      // last applied filter
+	Error   bool        // whether the current input is invalid
 }
 
 func NewDeviceTable() *DeviceTable {
@@ -35,6 +53,73 @@ func NewDeviceTable() *DeviceTable {
 	return t
 }
 
+// HandleInput processes vim-style search input and table shortcuts. It returns the
+// event to continue default handling, or nil if consumed.
+func (dt *DeviceTable) HandleInput(ev *tcell.EventKey) *tcell.EventKey {
+	if ev == nil {
+		return nil
+	}
+
+	if dt.searching {
+		switch ev.Key() {
+		case tcell.KeyEnter:
+			dt.searching = false
+			dt.emitStatus()
+			return ev // allow Enter to trigger selection
+		case tcell.KeyEsc:
+			dt.searching = false
+			dt.emitStatus()
+			return nil
+		case tcell.KeyBackspace, tcell.KeyBackspace2:
+			if len(dt.searchInput) > 0 {
+				dt.searchInput = dt.searchInput[:len(dt.searchInput)-1]
+				dt.applySearch(dt.searchInput)
+				return nil
+			}
+			dt.searching = false
+			dt.searchInput = ""
+			_ = dt.SetFilter("")
+			dt.emitStatus()
+			return nil
+		default:
+			if r := ev.Rune(); r != 0 {
+				dt.searchInput += string(r)
+				dt.applySearch(dt.searchInput)
+				return nil
+			}
+		}
+		return nil
+	}
+
+	// Normal mode shortcuts.
+	switch {
+	case ev.Key() == tcell.KeyEsc:
+		if dt.filterPattern != "" {
+			_ = dt.SetFilter("")
+			dt.emitStatus()
+			return nil
+		}
+		return ev
+	case ev.Rune() == '/':
+		dt.searching = true
+		dt.searchInput = ""
+		dt.filterError = false
+		dt.emitStatus()
+		return nil
+	case ev.Rune() == 'g':
+		dt.SelectFirst()
+		return nil
+	case ev.Rune() == 'G':
+		dt.SelectLast()
+		return nil
+	}
+
+	return ev
+}
+
+// OnSearchStatus registers a callback for search status changes.
+func (dt *DeviceTable) OnSearchStatus(cb func(SearchStatus)) { dt.onSearchStatus = cb }
+
 // SetFilter compiles and applies a regex filter across visible columns (case-insensitive).
 func (dt *DeviceTable) SetFilter(pattern string) error {
 	pattern = strings.TrimSpace(pattern)
@@ -43,21 +128,45 @@ func (dt *DeviceTable) SetFilter(pattern string) error {
 		dt.filterRE = nil
 		dt.refresh()
 		dt.SelectFirst()
+		dt.filterError = false
+		dt.emitStatus()
 		return nil
 	}
 	re, err := regexp.Compile("(?i)" + pattern)
 	if err != nil {
+		dt.filterError = true
+		dt.emitStatus()
 		return err
 	}
 	dt.filterPattern = pattern
 	dt.filterRE = re
+	dt.filterError = false
 	dt.refresh()
 	dt.SelectFirst()
+	dt.emitStatus()
 	return nil
 }
 
 // FilterPattern returns the current filter pattern, if any.
 func (dt *DeviceTable) FilterPattern() string { return dt.filterPattern }
+
+// applySearch applies an incremental search pattern, keeping the previous filter on errors.
+func (dt *DeviceTable) applySearch(pattern string) {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		dt.filterError = false
+		_ = dt.SetFilter("")
+		return
+	}
+	if err := dt.SetFilter(pattern); err != nil {
+		// Keep last good filter, only mark error state.
+		dt.filterError = true
+		dt.emitStatusWith(pattern)
+		return
+	}
+	dt.filterError = false
+	dt.emitStatus()
+}
 
 // Upsert merges device and refreshes table UI.
 func (dt *DeviceTable) Upsert(d *discovery.Device) {
@@ -185,6 +294,37 @@ func (dt *DeviceTable) refresh() {
 			dt.Select(1, 0)
 		}
 	}
+}
+
+// emitStatus reports the current search status to any subscriber.
+func (dt *DeviceTable) emitStatus() { dt.emitStatusWith(dt.searchInput) }
+
+func (dt *DeviceTable) emitStatusWith(input string) {
+	if dt.onSearchStatus == nil {
+		return
+	}
+	show := dt.searching
+	txt := ""
+	if show {
+		disp := input
+		if disp == "" {
+			disp = "/"
+		}
+		txt = "Regex Search: " + disp
+	}
+	color := tview.Styles.PrimaryTextColor
+	if dt.filterError {
+		color = tcell.ColorRed
+	}
+	status := SearchStatus{
+		Showing: show,
+		Text:    txt,
+		Color:   color,
+		Active:  dt.filterPattern != "",
+		Filter:  dt.filterPattern,
+		Error:   dt.filterError,
+	}
+	dt.onSearchStatus(status)
 }
 
 func (dt *DeviceTable) rowMatches(r tableRow) bool {
