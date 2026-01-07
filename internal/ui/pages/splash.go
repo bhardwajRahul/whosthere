@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/derailed/tview"
 	"github.com/ramonvermeulen/whosthere/internal/ui/navigation"
+	"github.com/rivo/tview"
 )
 
 var _ navigation.Page = (*SplashPage)(nil)

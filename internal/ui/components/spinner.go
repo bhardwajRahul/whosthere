@@ -3,7 +3,7 @@ package components
 import (
 	"time"
 
-	"github.com/derailed/tview"
+	"github.com/rivo/tview"
 )
 
 type Spinner struct {

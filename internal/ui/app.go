@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/derailed/tview"
 	"github.com/ramonvermeulen/whosthere/internal/config"
 	"github.com/ramonvermeulen/whosthere/internal/discovery"
 	"github.com/ramonvermeulen/whosthere/internal/discovery/arp"
@@ -15,6 +14,7 @@ import (
 	"github.com/ramonvermeulen/whosthere/internal/ui/navigation"
 	"github.com/ramonvermeulen/whosthere/internal/ui/pages"
 	"github.com/ramonvermeulen/whosthere/internal/ui/theme"
+	"github.com/rivo/tview"
 )
 
 const (

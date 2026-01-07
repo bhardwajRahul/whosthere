@@ -1,6 +1,6 @@
 package navigation
 
-import "github.com/derailed/tview"
+import "github.com/rivo/tview"
 
 // Page is a UI page that can be registered with the Router.
 type Page interface {

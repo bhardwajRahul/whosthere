@@ -4,10 +4,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/derailed/tcell/v2"
-	"github.com/derailed/tview"
+	"github.com/gdamore/tcell/v2"
 	"github.com/ramonvermeulen/whosthere/internal/config"
 	"github.com/ramonvermeulen/whosthere/internal/logging"
+	"github.com/rivo/tview"
 	"go.uber.org/zap"
 )
 
