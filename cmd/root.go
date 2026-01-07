@@ -8,6 +8,7 @@ import (
 	"github.com/ramonvermeulen/whosthere/internal/logging"
 	"github.com/ramonvermeulen/whosthere/internal/oui"
 	"github.com/ramonvermeulen/whosthere/internal/ui"
+	"github.com/ramonvermeulen/whosthere/internal/version"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -32,11 +33,21 @@ var (
 		},
 		RunE: run,
 	}
+
+	versionCmd = &cobra.Command{
+		Use:   "version",
+		Short: "Print the version and exit",
+		Run: func(cmd *cobra.Command, args []string) {
+			version.Fprint(cmd.OutOrStdout())
+		},
+	}
+
 	whosthereFlags = config.NewFlags()
 )
 
 func init() {
 	initWhosthereFlags()
+	rootCmd.AddCommand(versionCmd)
 }
 
 // Execute is the entrypoint for the CLI application
@@ -69,9 +80,9 @@ func run(*cobra.Command, []string) error {
 		zap.L().Warn("failed to initialize OUI database; manufacturer lookups will be disabled", zap.Error(err))
 	}
 
-	app := ui.NewApp(cfg, ouiDB)
-	if err := app.Run(); err != nil {
-		zap.L().Error("ui run failed", zap.Error(err))
+	tui := ui.NewApp(cfg, ouiDB, version.Version)
+	if err := tui.Run(); err != nil {
+		zap.L().Error("tui run failed", zap.Error(err))
 		return err
 	}
 

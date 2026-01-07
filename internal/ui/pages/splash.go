@@ -24,18 +24,18 @@ var LogoBig = []string{
 
 // SplashPage adapts the splash logo into a Page.
 type SplashPage struct {
-	root *tview.Flex
+	root    *tview.Flex
+	version string
 }
 
-func (p *SplashPage) Refresh() {
-}
+func (p *SplashPage) Refresh() {}
 
-func NewSplashPage() *SplashPage {
-	s := &SplashPage{root: tview.NewFlex().SetDirection(tview.FlexRow)}
+func NewSplashPage(version string) *SplashPage {
+	s := &SplashPage{root: tview.NewFlex().SetDirection(tview.FlexRow), version: version}
 
-	logo := tview.NewTextView()
-	logo.SetDynamicColors(true)
-	logo.SetTextAlign(tview.AlignCenter)
+	logo := tview.NewTextView().
+		SetDynamicColors(true).
+		SetTextAlign(tview.AlignCenter)
 	logo.SetTextColor(tview.Styles.SecondaryTextColor)
 
 	logoText := strings.Join(LogoBig, "\n")
@@ -46,13 +46,23 @@ func NewSplashPage() *SplashPage {
 
 	logoLines := len(strings.Split(logoText, "\n"))
 
-	centered := tview.NewFlex().
+	centeredLogo := tview.NewFlex().
 		SetDirection(tview.FlexRow).
 		AddItem(nil, 0, 1, false).
 		AddItem(logo, logoLines, 0, false).
 		AddItem(nil, 0, 1, false)
 
-	s.root.AddItem(centered, 0, 1, false)
+	versionView := tview.NewTextView().
+		SetDynamicColors(true).
+		SetTextAlign(tview.AlignCenter)
+	if version != "" {
+		_, _ = fmt.Fprintf(versionView, "whosthere - v%s", version)
+	}
+
+	// Root layout: logo takes remaining space, version line is always at bottom.
+	s.root.
+		AddItem(centeredLogo, 0, 1, false).
+		AddItem(versionView, 1, 0, false)
 
 	return s
 }

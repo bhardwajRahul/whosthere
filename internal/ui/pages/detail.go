@@ -8,6 +8,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/ramonvermeulen/whosthere/internal/discovery"
 	"github.com/ramonvermeulen/whosthere/internal/state"
+	"github.com/ramonvermeulen/whosthere/internal/ui/components"
 	"github.com/ramonvermeulen/whosthere/internal/ui/navigation"
 	"github.com/rivo/tview"
 )
@@ -23,17 +24,18 @@ type DetailPage struct {
 	navigate func(route string)
 }
 
-func NewDetailPage(s *state.AppState, navigate func(route string), uiQueue func(func())) *DetailPage {
+func NewDetailPage(s *state.AppState, navigate func(route string), uiQueue func(func()), version string) *DetailPage {
 	main := tview.NewFlex().SetDirection(tview.FlexRow)
-	main.AddItem(tview.NewTextView().SetText("whosthere").SetTextAlign(tview.AlignCenter), 0, 1, false)
+	header := components.NewHeader(version)
+	main.AddItem(header, 0, 1, false)
 
 	info := tview.NewTextView().SetDynamicColors(true).SetWrap(true)
 	info.SetBorder(true).SetTitle("Details").SetBorderColor(tview.Styles.BorderColor).SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 	main.AddItem(info, 0, 18, true)
 
-	statusFlex := tview.NewFlex().SetDirection(tview.FlexColumn)
-	statusFlex.AddItem(tview.NewTextView().SetText("Esc/q: Back").SetTextAlign(tview.AlignRight), 0, 4, false)
-	main.AddItem(statusFlex, 1, 0, false)
+	statusBar := components.NewStatusBar()
+	statusBar.SetHelp("Esc/q: Back")
+	main.AddItem(statusBar.Primitive(), 1, 0, false)
 
 	p := &DetailPage{Flex: main, state: s, info: info, navigate: navigate}
 
