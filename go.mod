@@ -4,7 +4,7 @@ go 1.25.4
 
 require (
 	github.com/gdamore/tcell/v2 v2.13.5
-	github.com/goccy/go-yaml v1.19.1
+	github.com/goccy/go-yaml v1.19.2
 	github.com/rivo/tview v0.42.0
 	github.com/spf13/cobra v1.10.2
 	go.uber.org/zap v1.27.1
