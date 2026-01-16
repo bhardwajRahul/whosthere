@@ -75,7 +75,7 @@ func (tp *ThemePicker) setupInputHandling() {
 }
 
 // Render implements UIComponent.
-func (tp *ThemePicker) Render(state state.ReadOnly) {
+func (tp *ThemePicker) Render(s state.ReadOnly) {
 	tp.Clear()
 	tp.SetBorder(true).
 		SetTitle(" Theme Picker ").
@@ -85,9 +85,9 @@ func (tp *ThemePicker) Render(state state.ReadOnly) {
 		SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 	tp.ShowSecondaryText(false)
 
-	currentTheme := state.CurrentTheme()
-	tp.previousTheme = state.PreviousTheme()
-	var currentIndex int = 0
+	currentTheme := s.CurrentTheme()
+	tp.previousTheme = s.PreviousTheme()
+	var currentIndex = 0
 
 	for i, themeName := range tp.themes {
 		displayName := themeName
