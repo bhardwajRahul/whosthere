@@ -35,38 +35,29 @@ type App struct {
 	primitives    []tview.Primitive
 	events        chan events.Event
 	emit          func(events.Event)
+	portScanner   *discovery.PortScanner
 }
 
 func NewApp(cfg *config.Config, ouiDB *oui.Registry, version string) *App {
 	app := tview.NewApplication()
-	appState := state.NewAppState()
-	appState.SetVersion(version)
-	themeName := config.DefaultThemeName
-	if cfg != nil && cfg.Theme.Name != "" {
-		themeName = cfg.Theme.Name
-	}
-	appState.SetCurrentTheme(themeName)
-	appState.SetPreviousTheme(themeName)
+	appState := state.NewAppState(cfg, version)
 
 	a := &App{
 		Application: app,
 		state:       appState,
 		cfg:         cfg,
 		events:      make(chan events.Event, 100),
+		portScanner: discovery.NewPortScanner(100),
 	}
 
 	a.emit = func(e events.Event) {
-		select {
-		case a.events <- e:
-		default:
-			// drop if full
-		}
+		a.events <- e
 	}
 	a.pages = tview.NewPages()
 
 	theme.SetRegisterFunc(a.RegisterPrimitive)
 
-	a.applyTheme(themeName)
+	a.applyTheme(appState.CurrentTheme())
 	a.setupPages(cfg)
 
 	if cfg != nil {
@@ -106,14 +97,16 @@ func (a *App) Run() error {
 
 func (a *App) setupPages(cfg *config.Config) {
 	dashboardPage := views.NewDashboardView(a.emit, a.QueueUpdateDraw)
-	detailPage := views.NewDetailView(a.emit)
+	detailPage := views.NewDetailView(a.emit, a.QueueUpdateDraw)
 	splashPage := views.NewSplashView(a.emit)
 	themePickerModal := views.NewThemeModalView(a.emit)
+	portScanModal := views.NewPortScanModalView(a.emit)
 
 	a.pages.AddPage(routes.RouteDashboard, dashboardPage, true, false)
 	a.pages.AddPage(routes.RouteDetail, detailPage, true, false)
 	a.pages.AddPage(routes.RouteSplash, splashPage, true, false)
 	a.pages.AddPage(routes.RouteThemePicker, themePickerModal, true, false)
+	a.pages.AddPage(routes.RoutePortScan, portScanModal, true, false)
 
 	initialPage := routes.RouteDashboard
 	if cfg != nil && cfg.Splash.Enabled {
@@ -215,7 +208,8 @@ func (a *App) RegisterPrimitive(p tview.Primitive) {
 
 // applyTheme applies a theme by name, updates state, applies to primitives, and renders all pages.
 func (a *App) applyTheme(name string) {
-	th := theme.Get(name)
+	a.cfg.Theme.Name = name
+	th := theme.Resolve(&a.cfg.Theme)
 	tview.Styles = th
 	for _, p := range a.primitives {
 		theme.ApplyToPrimitive(p)
@@ -266,8 +260,8 @@ func (a *App) handleEvents() {
 			}
 			a.resetFocus()
 		case events.ThemeSelected:
-			a.state.SetCurrentTheme(event.Name)
 			a.applyTheme(event.Name)
+			a.state.SetCurrentTheme(event.Name)
 		case events.ThemeSaved:
 			_ = theme.SaveToConfig(event.Name, a.cfg)
 		case events.ThemeConfirmed:
@@ -280,8 +274,36 @@ func (a *App) handleEvents() {
 			a.state.SetIsDiscovering(true)
 		case events.DiscoveryStopped:
 			a.state.SetIsDiscovering(false)
+		case events.PortScanStarted:
+			a.state.SetIsPortscanning(true)
+			a.emit(events.HideView{})
+			go a.startPortscan()
+		case events.PortScanStopped:
+			a.state.SetIsPortscanning(false)
 		}
 
 		a.rerenderVisibleViews()
 	}
+}
+
+func (a *App) startPortscan() {
+	device, ok := a.state.Selected()
+	if !ok {
+		a.emit(events.PortScanStopped{})
+		return
+	}
+	ip := device.IP.String()
+	ctx, cancel := context.WithTimeout(context.Background(), a.cfg.ScanDuration)
+	defer cancel()
+
+	device.OpenPorts = map[string][]int{}
+	device.LastPortScan = time.Now()
+
+	// todo(ramon) handle errors properly
+	_ = a.portScanner.Stream(ctx, ip, a.cfg.PortScanner.TCP, a.cfg.PortScanner.Timeout, func(port int) {
+		device.OpenPorts["tcp"] = append(device.OpenPorts["tcp"], port)
+		a.state.UpsertDevice(&device)
+	})
+
+	a.emit(events.PortScanStopped{})
 }

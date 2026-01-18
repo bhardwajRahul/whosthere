@@ -135,6 +135,9 @@ scanners:
     enabled: false
   arp:
     enabled: true
+port_scanner:
+  timeout: 5s
+  tcp: [80, 443]
 `
 
 	cfg := DefaultConfig()
@@ -160,6 +163,12 @@ scanners:
 	}
 	if !cfg.Scanners.MDNS.Enabled || cfg.Scanners.SSDP.Enabled || !cfg.Scanners.ARP.Enabled {
 		t.Errorf("scanner flags unexpected: %+v", cfg.Scanners)
+	}
+	if len(cfg.PortScanner.TCP) != 2 || cfg.PortScanner.TCP[0] != 80 || cfg.PortScanner.TCP[1] != 443 {
+		t.Errorf("tcp ports unexpected: %v", cfg.PortScanner.TCP)
+	}
+	if cfg.PortScanner.Timeout != DefaultPortScanTimeout {
+		t.Errorf("timeout unexpected: got %v, want %v", cfg.PortScanner.Timeout, 3*time.Second)
 	}
 }
 

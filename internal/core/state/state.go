@@ -3,6 +3,7 @@ package state
 import (
 	"sync"
 
+	"github.com/ramonvermeulen/whosthere/internal/core/config"
 	"github.com/ramonvermeulen/whosthere/internal/core/discovery"
 )
 
@@ -17,6 +18,8 @@ type ReadOnly interface {
 	Version() string
 	FilterPattern() string
 	IsDiscovering() bool
+	IsPortscanning() bool
+	Config() config.Config
 }
 
 // AppState holds application-level state shared across views and
@@ -24,19 +27,30 @@ type ReadOnly interface {
 type AppState struct {
 	mu sync.RWMutex
 
-	devices       map[string]discovery.Device
-	selectedIP    string
-	currentTheme  string
-	previousTheme string
-	version       string
-	filterPattern string
-	isDiscovering bool
+	devices        map[string]discovery.Device
+	selectedIP     string
+	previousTheme  string
+	version        string
+	filterPattern  string
+	isDiscovering  bool
+	isPortscanning bool
+	cfg            *config.Config
 }
 
-func NewAppState() *AppState {
-	return &AppState{
+func NewAppState(cfg *config.Config, version string) *AppState {
+	s := &AppState{
 		devices: make(map[string]discovery.Device),
+		version: version,
+		cfg:     cfg,
 	}
+
+	themeName := config.DefaultThemeName
+	if cfg != nil && cfg.Theme.Name != "" {
+		themeName = cfg.Theme.Name
+	}
+	s.previousTheme = themeName
+
+	return s
 }
 
 // UpsertDevice merges a device into the canonical device map.
@@ -102,14 +116,14 @@ func (s *AppState) SelectedIP() string {
 func (s *AppState) SetCurrentTheme(theme string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.currentTheme = theme
+	s.cfg.Theme.Name = theme
 }
 
 // CurrentTheme returns the current theme.
 func (s *AppState) CurrentTheme() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.currentTheme
+	return s.cfg.Theme.Name
 }
 
 // PreviousTheme returns the previous theme.
@@ -166,6 +180,27 @@ func (s *AppState) IsDiscovering() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.isDiscovering
+}
+
+// SetIsPortscanning sets the portscanning state.
+func (s *AppState) SetIsPortscanning(portscanning bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.isPortscanning = portscanning
+}
+
+// IsPortscanning returns the portscanning state.
+func (s *AppState) IsPortscanning() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.isPortscanning
+}
+
+// Config returns the port scanner configuration.
+func (s *AppState) Config() config.Config {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return *s.cfg
 }
 
 // ReadOnly returns a read-only interface to the state.

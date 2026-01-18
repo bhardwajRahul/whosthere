@@ -2,7 +2,7 @@ package views
 
 import (
 	"fmt"
-	"sort"
+	"strings"
 	"time"
 
 	"github.com/gdamore/tcell/v2"
@@ -11,6 +11,7 @@ import (
 	"github.com/ramonvermeulen/whosthere/internal/ui/events"
 	"github.com/ramonvermeulen/whosthere/internal/ui/routes"
 	"github.com/ramonvermeulen/whosthere/internal/ui/theme"
+	"github.com/ramonvermeulen/whosthere/internal/ui/utils"
 	"github.com/rivo/tview"
 )
 
@@ -23,22 +24,23 @@ type DetailView struct {
 	header    *components.Header
 	statusBar *components.StatusBar
 
-	emit func(events.Event)
+	emit  func(events.Event)
+	queue func(f func())
 }
 
-func NewDetailView(emit func(events.Event)) *DetailView {
+func NewDetailView(emit func(events.Event), queue func(f func())) *DetailView {
 	main := tview.NewFlex().SetDirection(tview.FlexRow)
 	header := components.NewHeader()
 
 	info := tview.NewTextView().SetDynamicColors(true).SetWrap(true)
 	info.SetBorder(true).
-		SetTitle("Details").
+		SetTitle(" Details ").
 		SetTitleColor(tview.Styles.TitleColor).
 		SetBorderColor(tview.Styles.BorderColor).
 		SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 
 	statusBar := components.NewStatusBar()
-	statusBar.SetHelp("Esc/q: Back")
+	statusBar.SetHelp("Esc/q: Back" + components.Divider + "p: Port Scan")
 
 	main.AddItem(header, 1, 0, false)
 	main.AddItem(info, 0, 1, true)
@@ -50,6 +52,7 @@ func NewDetailView(emit func(events.Event)) *DetailView {
 		header:    header,
 		statusBar: statusBar,
 		emit:      emit,
+		queue:     queue,
 	}
 
 	info.SetInputCapture(handleInput(p))
@@ -69,6 +72,9 @@ func handleInput(p *DetailView) func(ev *tcell.EventKey) *tcell.EventKey {
 		case ev.Key() == tcell.KeyEsc || ev.Rune() == 'q':
 			p.emit(events.NavigateTo{Route: routes.RouteDashboard, Overlay: true})
 			return nil
+		case ev.Rune() == 'p':
+			p.emit(events.NavigateTo{Route: routes.RoutePortScan, Overlay: true})
+			return nil
 		default:
 			return ev
 		}
@@ -86,8 +92,8 @@ func (d *DetailView) Render(s state.ReadOnly) {
 		return
 	}
 
-	labelColor := colorToHexTag(tview.Styles.SecondaryTextColor)
-	valueColor := colorToHexTag(tview.Styles.PrimaryTextColor)
+	labelColor := utils.ColorToHexTag(tview.Styles.SecondaryTextColor)
+	valueColor := utils.ColorToHexTag(tview.Styles.PrimaryTextColor)
 	formatTime := func(t time.Time) string {
 		if t.IsZero() {
 			return ""
@@ -106,7 +112,7 @@ func (d *DetailView) Render(s state.ReadOnly) {
 	if len(device.Sources) == 0 {
 		_, _ = fmt.Fprintln(d.info, "  (none)")
 	} else {
-		for _, src := range sortedKeys(device.Sources) {
+		for _, src := range utils.SortedKeys(device.Sources) {
 			_, _ = fmt.Fprintf(d.info, "  %s\n", src)
 		}
 	}
@@ -115,11 +121,18 @@ func (d *DetailView) Render(s state.ReadOnly) {
 	if len(device.OpenPorts) == 0 {
 		_, _ = fmt.Fprintln(d.info, "  (none)")
 	} else {
-		for _, port := range device.OpenPorts {
-			_, _ = fmt.Fprintf(d.info, "  %device\n", port)
+		for _, key := range utils.SortedKeys(device.OpenPorts) {
+			ports := device.OpenPorts[key]
+			if len(ports) > 0 {
+				_, _ = fmt.Fprintf(d.info, "  [%s::b]%s:[-::-]\n", labelColor, strings.ToUpper(key))
+				for _, port := range ports {
+					_, _ = fmt.Fprintf(d.info, "    %d\n", port)
+				}
+				_, _ = fmt.Fprintf(d.info, "\n")
+			}
 		}
 		if !device.LastPortScan.IsZero() {
-			_, _ = fmt.Fprintf(d.info, "\n[%s::b]Last portscan:[-::-] %s\n", labelColor, device.LastPortScan.Format("2006-01-02 15:04:05"))
+			_, _ = fmt.Fprintf(d.info, "[%s::b]Last portscan:[-::-] %s\n", labelColor, device.LastPortScan.Format("2006-01-02 15:04:05"))
 		}
 	}
 
@@ -127,27 +140,22 @@ func (d *DetailView) Render(s state.ReadOnly) {
 	if len(device.ExtraData) == 0 {
 		_, _ = fmt.Fprintln(d.info, "  (none)")
 	} else {
-		for _, k := range sortedKeys(device.ExtraData) {
+		for _, k := range utils.SortedKeys(device.ExtraData) {
 			_, _ = fmt.Fprintf(d.info, "  %s: %s\n", k, device.ExtraData[k])
 		}
 	}
 
 	d.header.Render(s)
 	d.statusBar.Render(s)
-}
 
-// colorToHexTag converts a tcell.Color to a tview dynamic color hex tag.
-func colorToHexTag(c tcell.Color) string {
-	r, g, b := c.RGB()
-	return fmt.Sprintf("#%02x%02x%02x", r, g, b)
-}
-
-// sortedKeys is a helper to return asc sorted map keys.
-func sortedKeys[T any](m map[string]T) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
+	switch {
+	case s.IsPortscanning():
+		d.statusBar.Spinner().SetSuffix(" Port scanning...")
+		d.statusBar.Spinner().Start(d.queue)
+	case s.IsDiscovering():
+		d.statusBar.Spinner().SetSuffix(" Discovering Devices...")
+		d.statusBar.Spinner().Start(d.queue)
+	default:
+		d.statusBar.Spinner().Stop(d.queue)
 	}
-	sort.Strings(keys)
-	return keys
 }
