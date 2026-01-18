@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
-	"sort"
 	"strings"
 	"time"
 
@@ -100,9 +99,6 @@ func runDaemon(cmd *cobra.Command, _ []string) error {
 func handleDevices(w http.ResponseWriter, r *http.Request, appState *state.AppState) {
 	zap.L().Info("incoming request", zap.String("method", r.Method), zap.String("path", r.URL.Path))
 	devices := appState.DevicesSnapshot()
-	sort.Slice(devices, func(i, j int) bool {
-		return devices[i].IP.String() < devices[j].IP.String()
-	})
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(devices); err != nil {
 		http.Error(w, "Failed to encode devices", http.StatusInternalServerError)

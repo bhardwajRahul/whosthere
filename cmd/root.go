@@ -19,10 +19,20 @@ import (
 const (
 	appName      = "whosthere"
 	shortAppDesc = "Local network discovery tool with a modern TUI interface."
-	longAppDesc  = `Local network discovery tool with a modern TUI interface written in Go.
+	longAppDesc  = "knock Knock..\n" + cyan + `
+          _               _   _                   ___
+__      _| |__   ___  ___| |_| |__   ___ _ __ ___/ _ \
+\ \ /\ / / '_ \ / _ \/ __| __| '_ \ / _ \ '__/ _ \// /
+ \ V  V /| | | | (_) \__ \ |_| | | |  __/ | |  __/ \/ 
+  \_/\_/ |_| |_|\___/|___/\__|_| |_|\___|_|  \___| () ` + reset + `
+
+
+Local network discovery tool with a modern TUI interface written in Go.
 Discover, explore, and understand your Local Area Network in an intuitive way.
 
 Knock Knock... who's there? 🚪`
+	cyan  = "\033[36m"
+	reset = "\033[0m"
 )
 
 var (
