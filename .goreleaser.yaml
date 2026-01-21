@@ -36,5 +36,5 @@ homebrew_casks:
       email: ramonvermeulen98@gmail.com
     repository:
       owner: ramonvermeulen
-      name: whosthere
+      name: homebrew-whosthere
       branch: main
