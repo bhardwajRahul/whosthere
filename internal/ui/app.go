@@ -6,11 +6,9 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell/v2"
+	"github.com/ramonvermeulen/whosthere/internal/core"
 	"github.com/ramonvermeulen/whosthere/internal/core/config"
 	"github.com/ramonvermeulen/whosthere/internal/core/discovery"
-	"github.com/ramonvermeulen/whosthere/internal/core/discovery/arp"
-	"github.com/ramonvermeulen/whosthere/internal/core/discovery/mdns"
-	"github.com/ramonvermeulen/whosthere/internal/core/discovery/ssdp"
 	"github.com/ramonvermeulen/whosthere/internal/core/oui"
 	"github.com/ramonvermeulen/whosthere/internal/core/state"
 	"github.com/ramonvermeulen/whosthere/internal/ui/events"
@@ -131,25 +129,7 @@ func (a *App) setupEngine(cfg *config.Config, ouiDB *oui.Registry) error {
 
 	a.portScanner = discovery.NewPortScanner(100, iface)
 
-	sweeper := arp.NewSweeper(iface, 5*time.Minute, time.Minute)
-	var scanners []discovery.Scanner
-
-	if cfg.Scanners.SSDP.Enabled {
-		scanners = append(scanners, ssdp.NewScanner(iface))
-	}
-	if cfg.Scanners.ARP.Enabled {
-		scanners = append(scanners, arp.NewScanner(iface, sweeper))
-	}
-	if cfg.Scanners.MDNS.Enabled {
-		scanners = append(scanners, mdns.NewScanner(iface))
-	}
-
-	a.engine = discovery.NewEngine(
-		scanners,
-		discovery.WithTimeout(cfg.ScanDuration),
-		discovery.WithOUIRegistry(ouiDB),
-		discovery.WithSubnetHook(sweeper.Trigger),
-	)
+	a.engine = core.BuildEngine(iface, ouiDB, core.GetEnabledFromCfg(cfg), cfg.ScanDuration)
 
 	return nil
 }

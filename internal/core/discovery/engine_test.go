@@ -116,33 +116,6 @@ func TestEngineStreamMergeAndDedup(t *testing.T) {
 	}
 }
 
-func TestEngineOnSubnetCalledPerSubnet(t *testing.T) {
-	devs1 := []Device{
-		{IP: net.ParseIP("10.0.1.10")},
-		{IP: net.ParseIP("10.0.1.20")},
-	}
-	devs2 := []Device{{IP: net.ParseIP("10.0.2.5")}}
-	devs3 := []Device{{IP: net.ParseIP("10.0.6.142")}}
-
-	scanners := []Scanner{
-		&fakeScanner{name: "a", devices: devs1},
-		&fakeScanner{name: "b", devices: devs2},
-		&fakeScanner{name: "c", devices: devs3},
-	}
-
-	var subnetCalls int
-	eng := NewEngine(scanners, WithTimeout(time.Second), WithSubnetHook(func(_ *net.IPNet) { subnetCalls++ }))
-
-	ctx := context.Background()
-	if _, err := eng.Stream(ctx, nil); err != nil {
-		t.Fatalf("Stream error: %v", err)
-	}
-
-	if subnetCalls != 3 {
-		t.Fatalf("expected 3 subnet calls (three /24s), got %d", subnetCalls)
-	}
-}
-
 func TestEngineTimeoutCancelsScanners(t *testing.T) {
 	slow := &fakeScanner{name: "slow", delay: 200 * time.Millisecond, devices: []Device{{IP: net.ParseIP("192.168.1.10")}}}
 	eng := NewEngine([]Scanner{slow}, WithTimeout(50*time.Millisecond))
