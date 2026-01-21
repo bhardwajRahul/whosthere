@@ -20,8 +20,6 @@ quickly find and identify devices on your Local Area Network.
 - **Daemon Mode with HTTP API:** Run in the background and integrate with other tools.
 - **Theming & Configuration:** Personalize the look and behavior via YAML configuration.
 
-Knock knock.. Who's there? 🚪
-
 ## Installation
 
 ```bash
