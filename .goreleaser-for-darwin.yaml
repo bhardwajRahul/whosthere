@@ -6,6 +6,11 @@ before:
     - go mod tidy
     - go generate
 
+# generate them ourselves to avoid issues with cross-compilation
+# goreleaser can only upload the checksum once, and within the context it doesn't have the other builds available
+checksum:
+  disable: true
+
 builds:
   - main: ./main.go
     binary: whosthere
