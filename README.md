@@ -32,19 +32,25 @@ Whosthere provides a friendly, intuitive way to answer the question every networ
 
 ## Installation
 
-Via Homebrew:
+Via [**Homebrew**](https://brew.sh/) with `brew`:
 
 ```bash
 brew install whosthere
 ```
 
-On NixOS:
+On [**NixOS**](https://nixos.org/) with `nix`:
 
 ```bash
 nix profile install nixpkgs#whosthere
 ```
 
-With Go:
+On [**Arch Linux**](https://archlinux.org/) with `yay`:
+
+```bash
+yay -S whosthere-bin
+```
+
+If your package manager is not listed you can always install with [**Go**](https://go.dev/):
 
 ```bash
 go install github.com/ramonvermeulen/whosthere@latest
@@ -57,6 +63,9 @@ git clone https://github.com/ramonvermeulen/whosthere.git
 cd whosthere
 make build
 ```
+
+Additionally, you can download pre-built binaries from the
+[**releases page**](https://github.com/ramonvermeulen/whosthere/releases).
 
 ## Usage
 
