@@ -1,6 +1,6 @@
 module github.com/ramonvermeulen/whosthere
 
-go 1.26.0
+go 1.27.1
 
 require (
 	github.com/dece2183/go-clipboard v1.0.0
